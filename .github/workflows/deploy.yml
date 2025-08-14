@@ -9,9 +9,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: amondnet/vercel-action@v25
+      - name: Deploy to Vercel
+        id: vercel-deploy
+        uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          scope: ${{ secrets.VERCEL_ORG_ID }}
+          scope: ${{ secrets.VERCEL_SCOPE }}
+          working-directory: ./
+      - name: Verify Deployment
+        run: |
+          if [ "${{ steps.vercel-deploy.outputs.url }}" = "" ]; then
+            echo "::error::Deployment failed"
+            exit 1
+          else
+            echo "Deployment URL: ${{ steps.vercel-deploy.outputs.url }}"
+          fi
