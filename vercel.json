@@ -1,4 +1,4 @@
 {
-  "builds": [ { "src": "snake_game.py", "use": "@vercel/python" } ],
-  "routes": [ { "src": "/(.*)", "dest": "snake_game.py" } ]
+  "builds": [ { "src": "game.py", "use": "@vercel/python" } ],
+  "routes": [ { "src": "/(.*)", "dest": "game.py" } ]
 }
