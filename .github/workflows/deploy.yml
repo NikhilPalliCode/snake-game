@@ -10,9 +10,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Deploy to Vercel
-        uses: BetaHuhn/deploy-to-vercel-action@v1
-        with:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PRODUCTION: 'true'  # Deploy to production
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Deploy
+        run: |
+          vercel --prod --token ${{ secrets.VERCEL_TOKEN }} --confirm
