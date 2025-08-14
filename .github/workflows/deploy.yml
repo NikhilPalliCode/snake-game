@@ -1,4 +1,4 @@
-name: Deploy to Vercel
+name: Deploy JavaScript Snake Game
 
 on:
   push:
@@ -10,6 +10,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Deploy
-        run: |
-          npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }} --confirm
+      - name: Deploy to Vercel
+        uses: BetaHuhn/deploy-to-vercel-action@v1
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          vercel-args: '--prod'  # Production deployment
