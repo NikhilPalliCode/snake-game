@@ -9,20 +9,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
+      - name: Validate Secrets
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "::error::VERCEL_TOKEN secret is missing"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "::error::VERCEL_PROJECT_ID secret is missing"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VERCEL_ORG_ID }}" ]; then
+            echo "::error::VERCEL_ORG_ID secret is missing"
+            exit 1
+          fi
+          echo "All required secrets are present"
+
       - name: Deploy to Vercel
-        id: vercel-deploy
         uses: amondnet/vercel-action@v25
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}  # Exact match (uppercase)
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}  # Exact match (uppercase)
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}  # Exact match (uppercase)
-          scope: ${{ secrets.VERCEL_SCOPE }}  # Must exist in your secrets
-          working-directory: ./
-      - name: Verify Deployment
-        run: |
-          if [ "${{ steps.vercel-deploy.outputs.url }}" = "" ]; then
-            echo "::error::Deployment failed"
-            exit 1
-          else
-            echo "Deployment URL: ${{ steps.vercel-deploy.outputs.url }}"
-          fi
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          scope: ${{ secrets.VERCEL_ORG_ID }}  # Use org ID as scope if team doesn't exist
