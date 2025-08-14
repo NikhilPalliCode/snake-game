@@ -2,14 +2,22 @@
   "version": 2,
   "builds": [
     {
-      "src": "game.py",
-      "use": "@vercel/python"
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "game.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "style.css",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
-      "dest": "game.py"
+      "src": "/",
+      "dest": "index.html"
     }
   ]
 }

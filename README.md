@@ -1,6 +1,6 @@
-# 🐍 Python Snake Game with Pygame
+# 🐍 Python Snake Game with Javascript
 
-A simple yet classic Snake game implementation using Python and Pygame library. Perfect for beginners learning game development or Python programming.
+A simple yet classic Snake game implementation using JS. 
 
 ![Snake Game Screenshot](snake-game-screenshot.png) 
 
