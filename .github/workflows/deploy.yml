@@ -13,10 +13,10 @@ jobs:
         id: vercel-deploy
         uses: amondnet/vercel-action@v25
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          scope: ${{ secrets.VERCEL_SCOPE }}
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}  # Exact match (uppercase)
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}  # Exact match (uppercase)
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}  # Exact match (uppercase)
+          scope: ${{ secrets.VERCEL_SCOPE }}  # Must exist in your secrets
           working-directory: ./
       - name: Verify Deployment
         run: |
