@@ -13,6 +13,6 @@ jobs:
       - name: Deploy to Vercel
         uses: BetaHuhn/deploy-to-vercel-action@v1
         with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          vercel-args: '--prod'  # Production deployment
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRODUCTION: 'true'  # Deploy to production
