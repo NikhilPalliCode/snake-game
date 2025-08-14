@@ -1,4 +1,15 @@
 {
-  "builds": [ { "src": "game.py", "use": "@vercel/python" } ],
-  "routes": [ { "src": "/(.*)", "dest": "game.py" } ]
+  "version": 2,
+  "builds": [
+    {
+      "src": "game.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "game.py"
+    }
+  ]
 }
