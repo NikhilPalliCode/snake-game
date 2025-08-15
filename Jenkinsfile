@@ -56,16 +56,17 @@ pipeline {
                 dir(env.DEPLOY_DIR) {
                     script {
                         try {
-                            // First try to get URL from vercel output
+                            // Method 1: Get URL from Vercel output
                             def deploymentUrl = bat(
                                 script: '''
-                                    vercel --prod --token %VERCEL_TOKEN% --confirm | findstr "https://.*\.vercel\.app"
+                                    vercel --prod --token %VERCEL_TOKEN% --confirm > deploy.log
+                                    findstr /r "https://.*\.vercel\.app" deploy.log
                                 ''',
                                 returnStdout: true
                             )?.trim()
                             
-                            // Fallback to project.json
-                            if (!deploymentUrl) {
+                            // Method 2: Fallback to project.json
+                            if (!deploymentUrl?.trim()) {
                                 deploymentUrl = bat(
                                     script: '''
                                         type .vercel\\project.json | jq -r .url
