@@ -22,10 +22,10 @@ pipeline {
 
         stage('Setup Environment') {
             steps {
-                sh '''
+                bat '''
                     echo "=== System Info ==="
-                    node -v
-                    npm -v
+                    node --version
+                    npm --version
                     npm install -g vercel@latest
                 '''
             }
@@ -34,9 +34,18 @@ pipeline {
         stage('Build & Test') {
             steps {
                 dir(env.DEPLOY_DIR) {
-                    sh '''
-                        [ -f package.json ] && npm install || echo "No package.json"
-                        [ -f test/test.js ] && npm test || echo "No tests configured"
+                    bat '''
+                        if exist package.json (
+                            npm install
+                        ) else (
+                            echo No package.json
+                        )
+                        
+                        if exist test\\test.js (
+                            npm test
+                        ) else (
+                            echo No tests configured
+                        )
                     '''
                 }
             }
@@ -47,21 +56,22 @@ pipeline {
                 dir(env.DEPLOY_DIR) {
                     script {
                         try {
-                            // Simplified URL capture
-                            def deploymentUrl = sh(
+                            // First try to get URL from vercel output
+                            def deploymentUrl = bat(
                                 script: '''
-                                    vercel --prod --token $VERCEL_TOKEN --confirm | grep -o "https://.*\\.vercel\\.app" || true
+                                    vercel --prod --token %VERCEL_TOKEN% --confirm | findstr "https://.*\.vercel\.app"
                                 ''',
                                 returnStdout: true
-                            ).trim()
+                            )?.trim()
                             
+                            // Fallback to project.json
                             if (!deploymentUrl) {
-                                deploymentUrl = sh(
+                                deploymentUrl = bat(
                                     script: '''
-                                        cat .vercel/project.json | jq -r .url
+                                        type .vercel\\project.json | jq -r .url
                                     ''',
                                     returnStdout: true
-                                ).trim()
+                                )?.trim()
                             }
                             
                             currentBuild.description = "Deployed: ${deploymentUrl}"
