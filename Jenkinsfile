@@ -56,24 +56,14 @@ pipeline {
                 dir(env.DEPLOY_DIR) {
                     script {
                         try {
-                            // Method 1: Get URL from Vercel output
+                            // Simple deployment without regex parsing
+                            bat 'vercel --prod --token %VERCEL_TOKEN% --confirm'
+                            
+                            // Get URL directly from project file
                             def deploymentUrl = bat(
-                                script: '''
-                                    vercel --prod --token %VERCEL_TOKEN% --confirm > deploy.log
-                                    findstr /r "https://.*\.vercel\.app" deploy.log
-                                ''',
+                                script: 'type .vercel\\project.json | jq -r .url',
                                 returnStdout: true
                             )?.trim()
-                            
-                            // Method 2: Fallback to project.json
-                            if (!deploymentUrl?.trim()) {
-                                deploymentUrl = bat(
-                                    script: '''
-                                        type .vercel\\project.json | jq -r .url
-                                    ''',
-                                    returnStdout: true
-                                )?.trim()
-                            }
                             
                             currentBuild.description = "Deployed: ${deploymentUrl}"
                             env.DEPLOYMENT_URL = deploymentUrl
