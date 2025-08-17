@@ -27,6 +27,7 @@ pipeline {
                     node --version
                     npm --version
                     npm install -g vercel@latest
+                    set PATH=%PATH%;%APPDATA%\\npm
                 '''
             }
         }
@@ -61,16 +62,14 @@ pipeline {
                             
                             // Get URL directly from project file
                             def deploymentUrl = bat(
-                                script: 'type .vercel\\project.json | jq -r .url',
+                                script: 'vercel --token %VERCEL_TOKEN% | findstr "Production"',
                                 returnStdout: true
                             )?.trim()
                             
                             currentBuild.description = "Deployed: ${deploymentUrl}"
                             env.DEPLOYMENT_URL = deploymentUrl
                         } catch (err) {
-                            slackSend channel: env.SLACK_CHANNEL,
-                                      color: 'danger',
-                                      message: "❌ DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+                            echo "❌ DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
                             error("Deployment failed")
                         }
                     }
@@ -81,9 +80,7 @@ pipeline {
 
     post {
         success {
-            slackSend channel: env.SLACK_CHANNEL,
-                      color: 'good',
-                      message: "✅ Snake Game deployed: ${env.DEPLOYMENT_URL}"
+            echo "✅ Snake Game deployed: ${env.DEPLOYMENT_URL}"
         }
     }
 }
