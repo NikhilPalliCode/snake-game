@@ -3,7 +3,6 @@ pipeline {
     
     environment {
         VERCEL_TOKEN = credentials('vercel-token')
-        REPO_URL = 'https://github.com/NikhilPalliCode/snake-game.git'
         SLACK_CHANNEL = '#game-deploys'
     }
     
@@ -11,11 +10,7 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 cleanWs()
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/master']],
-                    userRemoteConfigs: [[url: env.REPO_URL]]
-                ])
+                checkout scm
                 bat 'dir /s /b' // Verify directory structure
             }
         }
@@ -41,22 +36,24 @@ pipeline {
             }
         }
         
-        stage('Setup Environment') {
+        stage('Setup Vercel') {
             steps {
                 bat '''
-                    echo "=== System Info ==="
-                    node --version
-                    npm --version
-                    
-                    echo "Installing Vercel CLI..."
+                    echo "=== Installing Vercel CLI ==="
                     npm install -g vercel@latest
                     
-                    echo "Adding npm global bin to PATH..."
-                    for /f "delims=" %%a in ('npm prefix -g') do set NPM_GLOBAL=%%a
+                    echo "=== Updating PATH ==="
+                    for /f "delims=" %%a in ('npm prefix -g') do (
+                        set NPM_GLOBAL=%%a
+                        echo "Found npm global at: !NPM_GLOBAL!"
+                    )
+                    echo "Original PATH: %PATH%"
                     set PATH=%PATH%;%NPM_GLOBAL%
+                    echo "Updated PATH: %PATH%"
                     
-                    echo "Verifying installation..."
-                    vercel --version
+                    echo "=== Verifying Installation ==="
+                    vercel --version || echo "Vercel verification failed"
+                    where vercel
                 '''
             }
         }
@@ -65,15 +62,23 @@ pipeline {
             steps {
                 script {
                     try {
-                        // Deploy to Vercel
+                        // Get the exact path to vercel
+                        def vercelPath = bat(
+                            script: 'where vercel',
+                            returnStdout: true
+                        ).trim()
+                        
+                        echo "Using Vercel at: ${vercelPath}"
+                        
+                        // Deploy with full path
                         def deployOutput = bat(
-                            script: 'vercel --prod --token %VERCEL_TOKEN% --confirm',
+                            script: "\"${vercelPath}\" --prod --token %VERCEL_TOKEN% --confirm",
                             returnStdout: true
                         ).trim()
                         
                         // Extract deployment URL
                         def deploymentUrl = deployOutput.split('\n').find { 
-                            it.contains('https://') && (it.contains('now.sh') || it.contains('vercel.app'))
+                            it =~ /https:\/\/.*(vercel\.app|now\.sh)/
                         }?.trim()
                         
                         if (deploymentUrl) {
@@ -81,7 +86,7 @@ pipeline {
                             env.DEPLOYMENT_URL = deploymentUrl
                             echo "✅ Deployment successful: ${deploymentUrl}"
                         } else {
-                            error("Could not extract deployment URL from output")
+                            error("Could not extract deployment URL from output:\n${deployOutput}")
                         }
                     } catch (err) {
                         echo "❌ DEPLOY FAILED: ${err.getMessage()}"
@@ -94,21 +99,20 @@ pipeline {
     
     post {
         always {
-            echo "Pipeline completed - cleaning up"
+            echo "=== Pipeline completed ==="
+            bat 'vercel logout || echo "Vercel logout failed"'
         }
         success {
-            echo "✅ Deployment successful: ${env.DEPLOYMENT_URL}"
-            // If you install Slack plugin later:
+            echo "✅ Successfully deployed to: ${env.DEPLOYMENT_URL}"
             // slackSend channel: env.SLACK_CHANNEL, 
             //            color: 'good', 
-            //            message: "✅ Snake Game deployed: ${env.DEPLOYMENT_URL}"
+            //            message: "✅ Deployed: ${env.DEPLOYMENT_URL}"
         }
         failure {
-            echo "❌ Pipeline failed - check logs for details"
-            // For Slack notifications:
+            echo "❌ Pipeline failed"
             // slackSend channel: env.SLACK_CHANNEL,
             //            color: 'danger',
-            //            message: "❌ DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+            //            message: "❌ Deployment failed - ${env.BUILD_URL}"
         }
     }
 }
