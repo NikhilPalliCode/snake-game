@@ -4,8 +4,8 @@ pipeline {
     environment {
         VERCEL_TOKEN = credentials('vercel-token')
         REPO_URL = 'https://github.com/NikhilPalliCode/snake-game.git'
-        // Changed to root directory since snake-game is the main project dir
-        WORKING_DIR = '.'
+        // Update this path to match your Jenkins server's vercel.cmd location!
+        VERCEL_PATH = 'C:\\Users\\jenkins\\AppData\\Roaming\\npm\\vercel.cmd'
         NPM_PATH = 'npm.cmd' // Or full path like 'C:\\Program Files\\nodejs\\npm.cmd'
     }
     
@@ -20,71 +20,74 @@ pipeline {
                 ])
                 echo 'Code checked out successfully'
                 
-                // Verify directory structure
-                bat 'dir /s /b'
+                // Debug: Show directory structure
+                bat 'dir /b'
             }
         }
         
         stage('Verify Files') {
             steps {
-                dir(env.WORKING_DIR) {
-                    script {
-                        def requiredFiles = ['index.html', 'game.js', 'style.css']
-                        def missingFiles = []
-                        
-                        requiredFiles.each { file ->
-                            if (!fileExists(file)) {
-                                missingFiles.add(file)
-                            }
+                script {
+                    def requiredFiles = ['index.html', 'game.js', 'style.css', 'vercel.json']
+                    def missingFiles = []
+                    
+                    requiredFiles.each { file ->
+                        if (!fileExists(file)) {
+                            missingFiles.add(file)
                         }
-                        
-                        if (missingFiles) {
-                            error("Missing required files: ${missingFiles.join(', ')}")
-                        } else {
-                            echo 'All required files present'
-                        }
+                    }
+                    
+                    if (missingFiles) {
+                        error("Missing required files: ${missingFiles.join(', ')}")
+                    } else {
+                        echo 'All required files present'
                     }
                 }
             }
         }
         
-        stage('Setup Vercel') {
+        stage('Setup Environment') {
             steps {
                 bat """
-                    echo "Setting up Vercel CLI..."
+                    echo "Node.js version:"
+                    node --version
+                    echo "npm version:"
+                    ${env.NPM_PATH} --version
+                    echo "Installing Vercel CLI..."
                     ${env.NPM_PATH} install -g vercel@latest
-                    vercel --version
+                    echo "Vercel path: %VERCEL_PATH%"
+                    dir /s /b "%VERCEL_PATH%"
                 """
             }
         }
         
         stage('Deploy to Vercel') {
             steps {
-                dir(env.WORKING_DIR) {
-                    script {
-                        try {
-                            // Deploy to Vercel
-                            def deployOutput = bat(
-                                script: 'vercel --prod --token %VERCEL_TOKEN% --confirm',
-                                returnStdout: true
-                            ).trim()
-                            
-                            // Extract deployment URL
-                            def deploymentUrl = deployOutput.split('\n').find { 
-                                it.contains('https://') && it.contains('now.sh') || it.contains('vercel.app')
-                            }?.trim()
-                            
-                            if (deploymentUrl) {
-                                currentBuild.description = "Deployed: ${deploymentUrl}"
-                                env.DEPLOYMENT_URL = deploymentUrl
-                                echo "✅ Deployment successful: ${deploymentUrl}"
-                            } else {
-                                error("Could not extract deployment URL from output")
-                            }
-                        } catch (err) {
-                            echo "❌ DEPLOY FAILED: ${err.getMessage()}"
-                            error("Deployment failed")
+                script {
+                    try {
+                        // Deploy with explicit path
+                        def deployOutput = bat(
+                            script: """
+                                "%VERCEL_PATH%" --prod --token %VERCEL_TOKEN% --confirm
+                            """,
+                            returnStdout: true
+                        ).trim()
+                        
+                        // Parse deployment URL (supports both vercel.app and now.sh)
+                        def deploymentUrl = deployOutput.split('\n').find { 
+                            it.contains('https://') && (it.contains('vercel.app') || it.contains('now.sh'))
+                        }?.trim()
+                        
+                        if (deploymentUrl) {
+                            currentBuild.description = "Deployed: ${deploymentUrl}"
+                            env.DEPLOYMENT_URL = deploymentUrl
+                            echo "✅ Deployment successful: ${deploymentUrl}"
+                        } else {
+                            error("Could not extract deployment URL from output")
                         }
+                    } catch (err) {
+                        echo "❌ DEPLOY FAILED: ${err.getMessage()}"
+                        error("Deployment failed")
                     }
                 }
             }
@@ -93,14 +96,13 @@ pipeline {
     
     post {
         always {
-            echo "Cleaning up..."
-            // No need for vercel logout since we're using --token flag
+            echo "Pipeline completed - see logs for details"
         }
         success {
-            echo "✅ Deployment successful: ${env.DEPLOYMENT_URL}"
+            echo "✅ Success! Deployed to: ${env.DEPLOYMENT_URL}"
         }
         failure {
-            echo "❌ Pipeline failed - check logs for details"
+            echo "❌ Pipeline failed"
         }
     }
 }
