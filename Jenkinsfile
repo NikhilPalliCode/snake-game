@@ -4,8 +4,7 @@ pipeline {
     environment {
         VERCEL_TOKEN = credentials('vercel-token')
         REPO_URL = 'https://github.com/NikhilPalliCode/snake-game.git'
-        // This will automatically find npm's global bin directory
-        NPM_GLOBAL_BIN = bat(script: 'npm prefix -g', returnStdout: true).trim() + '\\node_modules\\npm\\bin'
+        SLACK_CHANNEL = '#game-deploys'
     }
     
     stages {
@@ -17,19 +16,48 @@ pipeline {
                     branches: [[name: '*/master']],
                     userRemoteConfigs: [[url: env.REPO_URL]]
                 ])
-                bat 'dir /b' // Verify files
+                bat 'dir /s /b' // Verify directory structure
             }
         }
         
-        stage('Setup Vercel') {
+        stage('Verify Files') {
             steps {
-                bat """
+                script {
+                    def requiredFiles = ['index.html', 'game.js', 'style.css', 'vercel.json']
+                    def missingFiles = []
+                    
+                    requiredFiles.each { file ->
+                        if (!fileExists(file)) {
+                            missingFiles.add(file)
+                        }
+                    }
+                    
+                    if (missingFiles) {
+                        error("Missing required files: ${missingFiles.join(', ')}")
+                    } else {
+                        echo 'All required files present'
+                    }
+                }
+            }
+        }
+        
+        stage('Setup Environment') {
+            steps {
+                bat '''
+                    echo "=== System Info ==="
+                    node --version
+                    npm --version
+                    
                     echo "Installing Vercel CLI..."
                     npm install -g vercel@latest
+                    
                     echo "Adding npm global bin to PATH..."
-                    set PATH=%PATH%;%APPDATA%\\npm
+                    for /f "delims=" %%a in ('npm prefix -g') do set NPM_GLOBAL=%%a
+                    set PATH=%PATH%;%NPM_GLOBAL%
+                    
+                    echo "Verifying installation..."
                     vercel --version
-                """
+                '''
             }
         }
         
@@ -37,29 +65,23 @@ pipeline {
             steps {
                 script {
                     try {
-                        // 1. First try with direct vercel command
+                        // Deploy to Vercel
                         def deployOutput = bat(
                             script: 'vercel --prod --token %VERCEL_TOKEN% --confirm',
                             returnStdout: true
                         ).trim()
                         
-                        // 2. If that fails, try with explicit npm path
-                        if (deployOutput.contains("not recognized")) {
-                            deployOutput = bat(
-                                script: "\"%NPM_GLOBAL_BIN%\\vercel.cmd\" --prod --token %VERCEL_TOKEN% --confirm",
-                                returnStdout: true
-                            ).trim()
-                        }
-                        
                         // Extract deployment URL
-                        def urlMatcher = deployOutput =~ /(https:\/\/[^\s]+(now\.sh|vercel\.app)[^\s]*)/
-                        def deploymentUrl = urlMatcher.find() ? urlMatcher.group(1) : null
+                        def deploymentUrl = deployOutput.split('\n').find { 
+                            it.contains('https://') && (it.contains('now.sh') || it.contains('vercel.app'))
+                        }?.trim()
                         
                         if (deploymentUrl) {
                             currentBuild.description = "Deployed: ${deploymentUrl}"
-                            echo "✅ Success! Deployed to: ${deploymentUrl}"
+                            env.DEPLOYMENT_URL = deploymentUrl
+                            echo "✅ Deployment successful: ${deploymentUrl}"
                         } else {
-                            error("Could not extract deployment URL")
+                            error("Could not extract deployment URL from output")
                         }
                     } catch (err) {
                         echo "❌ DEPLOY FAILED: ${err.getMessage()}"
@@ -72,7 +94,21 @@ pipeline {
     
     post {
         always {
-            echo "Pipeline completed - see logs for details"
+            echo "Pipeline completed - cleaning up"
+        }
+        success {
+            echo "✅ Deployment successful: ${env.DEPLOYMENT_URL}"
+            // If you install Slack plugin later:
+            // slackSend channel: env.SLACK_CHANNEL, 
+            //            color: 'good', 
+            //            message: "✅ Snake Game deployed: ${env.DEPLOYMENT_URL}"
+        }
+        failure {
+            echo "❌ Pipeline failed - check logs for details"
+            // For Slack notifications:
+            // slackSend channel: env.SLACK_CHANNEL,
+            //            color: 'danger',
+            //            message: "❌ DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
         }
     }
 }
