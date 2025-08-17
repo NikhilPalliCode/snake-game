@@ -4,9 +4,9 @@ pipeline {
     environment {
         VERCEL_TOKEN = credentials('vercel-token')
         REPO_URL = 'https://github.com/NikhilPalliCode/snake-game.git'
-        DEPLOY_DIR = 'snake-game'
-        // Explicit path to npm (adjust if needed)
-        NPM_PATH = 'C:\\Program Files\\nodejs\\npm.cmd'
+        // Changed to root directory since snake-game is the main project dir
+        WORKING_DIR = '.'
+        NPM_PATH = 'npm.cmd' // Or full path like 'C:\\Program Files\\nodejs\\npm.cmd'
     }
     
     stages {
@@ -19,15 +19,31 @@ pipeline {
                     userRemoteConfigs: [[url: env.REPO_URL]]
                 ])
                 echo 'Code checked out successfully'
+                
+                // Verify directory structure
+                bat 'dir /s /b'
             }
         }
         
         stage('Verify Files') {
             steps {
-                dir(env.DEPLOY_DIR) {
-                    bat 'dir /B'
-                    bat 'if not exist index.html (echo index.html missing! && exit /b 1)'
-                    echo 'Basic file verification passed'
+                dir(env.WORKING_DIR) {
+                    script {
+                        def requiredFiles = ['index.html', 'game.js', 'style.css']
+                        def missingFiles = []
+                        
+                        requiredFiles.each { file ->
+                            if (!fileExists(file)) {
+                                missingFiles.add(file)
+                            }
+                        }
+                        
+                        if (missingFiles) {
+                            error("Missing required files: ${missingFiles.join(', ')}")
+                        } else {
+                            echo 'All required files present'
+                        }
+                    }
                 }
             }
         }
@@ -35,9 +51,8 @@ pipeline {
         stage('Setup Vercel') {
             steps {
                 bat """
-                    echo "Installing Vercel CLI..."
-                    "%NPM_PATH%" install -g vercel@latest
-                    echo "Verifying installation..."
+                    echo "Setting up Vercel CLI..."
+                    ${env.NPM_PATH} install -g vercel@latest
                     vercel --version
                 """
             }
@@ -45,28 +60,30 @@ pipeline {
         
         stage('Deploy to Vercel') {
             steps {
-                dir(env.DEPLOY_DIR) {
+                dir(env.WORKING_DIR) {
                     script {
                         try {
-                            // Deploy with explicit path if needed
+                            // Deploy to Vercel
                             def deployOutput = bat(
                                 script: 'vercel --prod --token %VERCEL_TOKEN% --confirm',
                                 returnStdout: true
                             ).trim()
                             
-                            // Parse deployment URL from output
-                            def deploymentUrl = deployOutput.split('\n').find { it.contains('https://') }?.trim()
+                            // Extract deployment URL
+                            def deploymentUrl = deployOutput.split('\n').find { 
+                                it.contains('https://') && it.contains('now.sh') || it.contains('vercel.app')
+                            }?.trim()
                             
                             if (deploymentUrl) {
                                 currentBuild.description = "Deployed: ${deploymentUrl}"
                                 env.DEPLOYMENT_URL = deploymentUrl
                                 echo "✅ Deployment successful: ${deploymentUrl}"
                             } else {
-                                error("Failed to extract deployment URL from output")
+                                error("Could not extract deployment URL from output")
                             }
                         } catch (err) {
-                            echo "❌ DEPLOY FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}"
-                            error("Deployment failed: ${err.getMessage()}")
+                            echo "❌ DEPLOY FAILED: ${err.getMessage()}"
+                            error("Deployment failed")
                         }
                     }
                 }
@@ -75,14 +92,15 @@ pipeline {
     }
     
     post {
+        always {
+            echo "Cleaning up..."
+            // No need for vercel logout since we're using --token flag
+        }
         success {
-            echo "✅ Snake Game deployed successfully: ${env.DEPLOYMENT_URL}"
+            echo "✅ Deployment successful: ${env.DEPLOYMENT_URL}"
         }
         failure {
-            echo "❌ Deployment failed - check logs for details"
-        }
-        always {
-            bat 'vercel logout' // Clean up auth
+            echo "❌ Pipeline failed - check logs for details"
         }
     }
 }
